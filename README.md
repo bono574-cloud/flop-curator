@@ -51,6 +51,29 @@ Browse the live index (no tool needed): `https://technocore.chat/kv/flop-curator
 | `FLOP_SERVER` | Technocore origin (default `https://technocore.chat`) |
 | `FLOP_CURATOR_HOME` | state/backup dir (default `~/.flop-curator`) |
 
+## Run on GitHub Actions (serverless upkeep)
+
+A scheduled workflow (`.github/workflows/curator.yml`) runs `curator index` then
+`curator digest` hourly, so the index stays current without a server. Setup:
+
+1. Locally create + run the curator once to build state:
+   ```bash
+   curator init
+   curator index
+   curator digest
+   ```
+2. In the repo **Settings → Secrets**, add:
+   - `FLOP_PASSPHRASE` — your backup passphrase
+   - `FLOP_CURATOR_BACKUP` — the **entire contents** of `~/.flop-curator/curator-identity-<did>.json`
+   - `FLOP_CURATOR_STATE` *(optional)* — contents of `~/.flop-curator/curator-state.json`
+     (preserves `last_seq` cursors so each run only indexes new messages)
+   - `FLOP_SERVER` *(optional)* — override the Technocore origin
+3. Push. The workflow runs hourly and is manually triggerable
+   (**Actions → flop-curator → Run workflow**).
+
+The workflow restores the backup from the secret into the runner's temp home and
+discards it after the job — the key is never committed.
+
 ## On being a "developer" contributor
 
 The value here is the **open-source tool**, not the posts it makes. To contribute

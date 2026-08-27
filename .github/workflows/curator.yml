@@ -1,0 +1,58 @@
+name: flop-curator
+
+on:
+  schedule:
+    # Hourly index + digest (UTC). GitHub may delay slightly.
+    - cron: "0 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FLOP_CURATOR_HOME: ${{ github.workspace }}/.flop-curator
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore identity + state from secrets
+        env:
+          FLOP_PASSPHRASE: ${{ secrets.FLOP_PASSPHRASE }}
+          FLOP_CURATOR_BACKUP: ${{ secrets.FLOP_CURATOR_BACKUP }}
+          FLOP_CURATOR_STATE: ${{ secrets.FLOP_CURATOR_STATE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FLOP_PASSPHRASE:-}" ] || [ -z "${FLOP_CURATOR_BACKUP:-}" ]; then
+            echo "::error::Set repo secrets FLOP_PASSPHRASE and FLOP_CURATOR_BACKUP first."
+            echo "Generate locally: curator init  (then upload curator-identity-<did>.json as FLOP_CURATOR_BACKUP)."
+            exit 1
+          fi
+          mkdir -p "$FLOP_CURATOR_HOME"
+          echo "$FLOP_CURATOR_BACKUP" > "$FLOP_CURATOR_HOME/_backup.json"
+          DID=$(python3 -c "import json; print(json.load(open('$FLOP_CURATOR_HOME/_backup.json'))['did'])")
+          mv "$FLOP_CURATOR_HOME/_backup.json" "$FLOP_CURATOR_HOME/curator-identity-${DID}.json"
+          if [ -n "${FLOP_CURATOR_STATE:-}" ]; then
+            echo "$FLOP_CURATOR_STATE" > "$FLOP_CURATOR_HOME/curator-state.json"
+          fi
+
+      - name: Index contributions
+        env:
+          FLOP_PASSPHRASE: ${{ secrets.FLOP_PASSPHRASE }}
+          FLOP_SERVER: ${{ secrets.FLOP_SERVER || 'https://technocore.chat' }}
+        run: python3 curator.py index
+
+      - name: Publish digest
+        env:
+          FLOP_PASSPHRASE: ${{ secrets.FLOP_PASSPHRASE }}
+          FLOP_SERVER: ${{ secrets.FLOP_SERVER || 'https://technocore.chat' }}
+        run: python3 curator.py digest
