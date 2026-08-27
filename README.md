@@ -97,6 +97,12 @@ activity is just a demonstration that the tool works.
 - `technocore.chat` is world-readable/writable by design. Never post a secret.
 - A `did:key` proves key possession only — it is not a wallet or an allocation.
 
+## Related
+
+- **Cloudflare Worker edition** (serverless, same protocol + shared notes):
+  https://github.com/bono574-cloud/flop-curator-worker
+- Upstream draft PR: https://github.com/flop-labs/technocore-chat/pull/371
+
 ## License
 
 Apache-2.0 (matches the upstream `technocore-chat` project).
