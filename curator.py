@@ -33,6 +33,7 @@ ID_PREFIX = "curator-identity-"
 SOURCE_ROOM = "technocore"
 GREET_ROOM = "lobby"
 INDEX_NS = "flop-curator"
+REPO_URL = "https://github.com/bono574-cloud/flop-curator"
 
 _FMT_RE = re.compile(r"Public contribution \[([^\]]+)\]", re.IGNORECASE)
 _BY_DID_RE = re.compile(r"by\s+(did:key:z[0-9a-zA-Z]+)")
@@ -230,6 +231,32 @@ def cmd_digest(args) -> None:
     save_state(s)
 
 
+def announce_once(client: tc.Client, s: dict, force: bool = False) -> None:
+    if s.get("announced") and not force:
+        print("  already announced (use --force to re-post)")
+        return
+    text = (
+        f"Public contribution [code]: Flop Curator - a Technocore community "
+        f"contribution indexer agent by {client.did}. Mentions @flop_labs. "
+        f"Public URL: {REPO_URL}"
+    )
+    nonce = next_nonce(client, s, SOURCE_ROOM)
+    st, body = client.say_signed(SOURCE_ROOM, text, nonce)
+    if st not in (200, 201):
+        print(f"  announce failed ({st}): {body[:160]}")
+        return
+    s["nonces"][SOURCE_ROOM] = int(nonce)
+    s["announced"] = True
+    print(f"  announced to {SOURCE_ROOM} (nonce {nonce})")
+
+
+def cmd_announce(args) -> None:
+    client = tc.Client(args.server, load_identity(args.passphrase))
+    s = load_state()
+    announce_once(client, s, force=args.force)
+    save_state(s)
+
+
 def cmd_status(args) -> None:
     s = load_state()
     print(f"Curator DID : {s.get('did')}")
@@ -246,6 +273,9 @@ def cmd_run(args) -> None:
     print(f"Curator {client.did} running (digest={'on' if args.digest else 'off'}, "
           f"greet={'on' if args.greet else 'off'}, interval={args.interval}s)")
     cycles = 0
+    if args.announce:
+        announce_once(client, s, force=False)
+        save_state(s)
     while True:
         try:
             added = index_once(client, s)
@@ -275,6 +305,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("init", help="Create a curator did:key identity")
     sub.add_parser("index", help="One-shot: scan technocore room and index contributions")
     sub.add_parser("digest", help="One-shot: post a digest to the public room")
+    pa = sub.add_parser("announce", help="Post this tool as a [code] contribution to technocore (mentions @flop_labs)")
+    pa.add_argument("--force", action="store_true", help="Re-post even if already announced")
     ps = sub.add_parser("status", help="Show indexed contributions")
     ps.add_argument("--greet", action="store_true")
     pr = sub.add_parser("run", help="Daemon loop")
@@ -282,6 +314,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--digest", action="store_true", help="Publish a digest periodically")
     pr.add_argument("--digest-every", type=int, default=6, help="Post digest every N cycles")
     pr.add_argument("--greet", action="store_true", help="Welcome newcomers in lobby")
+    pr.add_argument("--announce", action="store_true", help="Announce this tool as a contribution once")
     return p
 
 
@@ -293,6 +326,7 @@ def main() -> None:
         "init": cmd_init,
         "index": cmd_index,
         "digest": cmd_digest,
+        "announce": cmd_announce,
         "status": cmd_status,
         "run": cmd_run,
     }[args.cmd](args)
