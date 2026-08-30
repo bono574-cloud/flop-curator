@@ -43,6 +43,8 @@ jobs:
           mv "$FLOP_CURATOR_HOME/_backup.json" "$FLOP_CURATOR_HOME/curator-identity-${DID}.json"
           if [ -n "${FLOP_CURATOR_STATE:-}" ]; then
             echo "$FLOP_CURATOR_STATE" > "$FLOP_CURATOR_HOME/curator-state.json"
+          else
+            python3 -c "import json; json.dump({'did':'$DID','nonces':{},'last_seq':{},'contributions':[],'greeted':[]}, open('$FLOP_CURATOR_HOME/curator-state.json','w'), indent=2)"
           fi
 
       - name: Index contributions
